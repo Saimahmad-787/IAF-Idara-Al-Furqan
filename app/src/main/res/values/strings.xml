@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">IAF — Idara Al-Furqan</string>
+    <string name="institute_full_name">Idara Al-Furqan (ادارہ الفرقان)</string>
+    <string name="default_institute_id">IAF-2026</string>
+</resources>

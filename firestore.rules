@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isTeacher(instituteId) {
+      return isAuthenticated() && 
+        request.auth.token.instituteId == instituteId &&
+        request.auth.token.role == 'Teacher';
+    }
+
+    function isParent(instituteId) {
+      return isAuthenticated() &&
+        request.auth.token.instituteId == instituteId &&
+        request.auth.token.role == 'Parent';
+    }
+
+    function isLinkedParent(instituteId, studentId) {
+      return isParent(instituteId) &&
+        exists(/databases/$(database)/documents/institutes/$(instituteId)/parent_student_links/$(request.auth.uid + '_' + studentId)) &&
+        get(/databases/$(database)/documents/institutes/$(instituteId)/parent_student_links/$(request.auth.uid + '_' + studentId)).data.status == 'Approved';
+    }
+
+    match /institutes/{instituteId} {
+      allow read: if isAuthenticated();
+      
+      // Teachers have full management inside their institute
+      match /teachers/{teacherId} {
+        allow read: if isAuthenticated() && request.auth.token.instituteId == instituteId;
+        allow write: if isTeacher(instituteId);
+      }
+
+      // Students collection
+      match /students/{studentId} {
+        allow read: if isTeacher(instituteId) || isLinkedParent(instituteId, studentId);
+        allow write: if isTeacher(instituteId);
+      }
+
+      // Parent-Student Links
+      match /parent_student_links/{linkId} {
+        allow read: if isTeacher(instituteId) || (isParent(instituteId) && resource.data.parentUid == request.auth.uid);
+        allow create: if isParent(instituteId) && request.resource.data.parentUid == request.auth.uid && request.resource.data.status == 'Pending';
+        allow update, delete: if isTeacher(instituteId);
+      }
+
+      // Attendance
+      match /attendance/{attendanceId} {
+        allow read: if isTeacher(instituteId) || isLinkedParent(instituteId, resource.data.studentId);
+        allow write: if isTeacher(instituteId);
+      }
+
+      // Quran Learning
+      match /quran_records/{recordId} {
+        allow read: if isTeacher(instituteId) || isLinkedParent(instituteId, resource.data.studentId);
+        allow write: if isTeacher(instituteId);
+      }
+
+      // Fee Payments & Invoices
+      match /fee_payments/{feeId} {
+        allow read: if isTeacher(instituteId) || isLinkedParent(instituteId, resource.data.studentId);
+        allow create: if isLinkedParent(instituteId, request.resource.data.studentId) && request.resource.data.status == 'Pending Verification';
+        allow update, delete: if isTeacher(instituteId);
+      }
+
+      // Shifts & Prayers
+      match /shifts/{shiftId} {
+        allow read: if isAuthenticated();
+        allow write: if isTeacher(instituteId);
+      }
+
+      match /prayer_timings/{prayerId} {
+        allow read: if isAuthenticated();
+        allow write: if isTeacher(instituteId);
+      }
+
+      // Retention Reviews & Audits
+      match /retention_reviews/{reviewId} {
+        allow read, write: if isTeacher(instituteId);
+      }
+
+      match /audit_logs/{logId} {
+        allow read: if isTeacher(instituteId);
+        allow create: if isAuthenticated();
+        allow update, delete: if false; // Immutable audit log
+      }
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "IAF — Idara Al-Furqan",
+  "description": "Islamic Institute Management Application for Idara Al-Furqan (ادارہ الفرقان): Real-time Student Management, Attendance, Quran Learning (Hifz/Nazra/Qaida), Fees, Verified Parent-Student Linking, and Digital Student ID Cards.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
