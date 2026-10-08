@@ -1,0 +1,187 @@
+{
+  "entities": {
+    "Institute": {
+      "title": "Institute",
+      "description": "Institute profile and configuration.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "primaryInstituteId": { "type": "string" },
+        "secondaryInstituteId": { "type": "string" },
+        "authorizationCode": { "type": "string" }
+      },
+      "required": ["name", "primaryInstituteId"]
+    },
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Teacher/Operator account profile.",
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "role": { "type": "string", "enum": ["Teacher"] },
+        "instituteId": { "type": "string" }
+      },
+      "required": ["username", "fullName", "role", "instituteId"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student educational profile, enrollment and identification details.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "instituteStudentCode": { "type": "string" },
+        "fullName": { "type": "string" },
+        "photoUri": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "dobOrAge": { "type": "string" },
+        "fatherName": { "type": "string" },
+        "fatherCnic": { "type": "string" },
+        "fatherCnicPhotoUri": { "type": "string" },
+        "studentCnicOrBForm": { "type": "string" },
+        "studentBFormPhotoUri": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
+        "admissionDate": { "type": "string" },
+        "program": { "type": "string" },
+        "className": { "type": "string" },
+        "assignedTeacher": { "type": "string" },
+        "monthlyFee": { "type": "number" },
+        "feeStartDate": { "type": "string" },
+        "dueDate": { "type": "string" },
+        "approvedConcession": { "type": "number" },
+        "notes": { "type": "string" }
+      },
+      "required": ["instituteStudentCode", "fullName", "program", "className"]
+    },
+    "ParentStudentLink": {
+      "title": "ParentStudentLink",
+      "description": "Link request/relationship connecting parent to student via Institute ID.",
+      "type": "object",
+      "properties": {
+        "parentUid": { "type": "string" },
+        "parentUsername": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentInstituteCode": { "type": "string" },
+        "studentName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "reviewedBy": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["parentUid", "studentInstituteCode", "status"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily attendance record for a student.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string", "enum": ["Present", "Absent", "Leave", "Late"] },
+        "markedBy": { "type": "string" }
+      },
+      "required": ["studentId", "date", "status"]
+    },
+    "QuranRecord": {
+      "title": "QuranRecord",
+      "description": "Sabaq, Sabqi, and Manzil progress record for a student.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "date": { "type": "string" },
+        "recordType": { "type": "string" },
+        "sabaq": { "type": "string" },
+        "sabqi": { "type": "string" },
+        "manzil": { "type": "string" },
+        "evaluation": { "type": "string" },
+        "recordedBy": { "type": "string" }
+      },
+      "required": ["studentId", "date", "recordType"]
+    },
+    "FeePayment": {
+      "title": "FeePayment",
+      "description": "Monthly fee payment, verification submission, and receipts.",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string" },
+        "studentName": { "type": "string" },
+        "month": { "type": "string" },
+        "amountDue": { "type": "number" },
+        "amountPaid": { "type": "number" },
+        "status": { "type": "string", "enum": ["Unpaid", "Paid", "Pending Verification", "Rejected"] },
+        "paymentMethod": { "type": "string" },
+        "paymentReference": { "type": "string" },
+        "receiptScreenshotUrl": { "type": "string" },
+        "paidDate": { "type": "string" },
+        "verifiedBy": { "type": "string" }
+      },
+      "required": ["studentId", "month", "amountDue", "status"]
+    },
+    "Shift": {
+      "title": "Shift",
+      "description": "Institute shift timing configuration.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "days": { "type": "string" },
+        "assignedClass": { "type": "string" },
+        "assignedTeacher": { "type": "string" },
+        "room": { "type": "string" }
+      },
+      "required": ["name", "startTime", "endTime"]
+    },
+    "PrayerTiming": {
+      "title": "PrayerTiming",
+      "description": "Daily congregational prayer timings at the institute.",
+      "type": "object",
+      "properties": {
+        "prayerName": { "type": "string" },
+        "timeString": { "type": "string" }
+      },
+      "required": ["prayerName", "timeString"]
+    }
+  },
+  "firestore": {
+    "/institutes/{instituteId}": {
+      "schema": "Institute",
+      "description": "Institute profile and configurations."
+    },
+    "/institutes/{instituteId}/teachers/{teacherId}": {
+      "schema": "Teacher",
+      "description": "Teacher profiles belonging to the institute."
+    },
+    "/institutes/{instituteId}/students/{studentId}": {
+      "schema": "Student",
+      "description": "Students enrolled in the institute."
+    },
+    "/institutes/{instituteId}/parent_student_links/{linkId}": {
+      "schema": "ParentStudentLink",
+      "description": "Parent verification requests and access relationships."
+    },
+    "/institutes/{instituteId}/attendance/{attendanceId}": {
+      "schema": "Attendance",
+      "description": "Student attendance entries."
+    },
+    "/institutes/{instituteId}/quran_records/{recordId}": {
+      "schema": "QuranRecord",
+      "description": "Hifz, Nazra, and Qaida Sabaq records."
+    },
+    "/institutes/{instituteId}/fee_payments/{feeId}": {
+      "schema": "FeePayment",
+      "description": "Fee invoices, payment submissions, and approval status."
+    },
+    "/institutes/{instituteId}/shifts/{shiftId}": {
+      "schema": "Shift",
+      "description": "Institute shift timings."
+    },
+    "/institutes/{instituteId}/prayer_timings/{prayerId}": {
+      "schema": "PrayerTiming",
+      "description": "Institute daily prayer timings."
+    }
+  }
+}

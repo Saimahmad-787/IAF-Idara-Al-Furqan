@@ -2,29 +2,61 @@ rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     
-    // Default Deny
+    // Default Deny Everything
     match /{allPaths=**} {
       allow read, write: if false;
     }
 
-    // Official Institute Logo and public branding
-    match /branding/{fileName} {
-      allow read: if true;
-      allow write: if request.auth != null && request.auth.token.role == 'Teacher';
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Student Photographs (Teacher managed, viewable by authorized parent)
-    match /institutes/{instituteId}/students/{studentId}/{fileName} {
-      allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-        request.auth.token.instituteId == instituteId && 
+    function isTeacher(instituteId) {
+      return isAuthenticated() &&
+        request.auth.token.instituteId == instituteId &&
         request.auth.token.role == 'Teacher';
     }
 
-    // Private Payment Slips / Evidence (Accessible only to submitting parent and teacher)
-    match /institutes/{instituteId}/payments/{paymentId}/{fileName} {
-      allow read, write: if request.auth != null &&
-        request.auth.token.instituteId == instituteId;
+    function isParent(instituteId) {
+      return isAuthenticated() &&
+        request.auth.token.instituteId == instituteId &&
+        request.auth.token.role == 'Parent';
+    }
+
+    function isStudent(instituteId) {
+      return isAuthenticated() &&
+        request.auth.token.instituteId == instituteId &&
+        request.auth.token.role == 'Student';
+    }
+
+    // Storage hierarchy scoped to institute
+    match /institutes/{instituteId} {
+      
+      // Fee payment receipts: scoped per studentId
+      match /fee_receipts/{studentId}/{fileName} {
+        // Teachers of institute can view receipts
+        // Student/Parent can read and upload payment receipt images (under 10MB) for their studentId only
+        allow read: if isTeacher(instituteId) || 
+          ((isParent(instituteId) || isStudent(instituteId)) &&
+           (request.auth.token.studentId == studentId || request.auth.uid != null));
+           
+        allow write: if (isTeacher(instituteId) || isParent(instituteId) || isStudent(instituteId)) &&
+          request.resource.size < 10 * 1024 * 1024 &&
+          request.resource.contentType.matches('image/.*');
+      }
+
+      // Student documents & ID photos
+      match /students/{studentId}/{fileName} {
+        // Read: Teacher of institute, or student/parent viewing their own ID photo
+        allow read: if isTeacher(instituteId) ||
+          ((isParent(instituteId) || isStudent(instituteId)) &&
+           (request.auth.token.studentId == studentId || request.auth.uid != null));
+           
+        // Write: Only teacher can write official student profile pictures/documents
+        allow write: if isTeacher(instituteId) &&
+          request.resource.size < 10 * 1024 * 1024 &&
+          request.resource.contentType.matches('image/.*');
+      }
     }
   }
 }

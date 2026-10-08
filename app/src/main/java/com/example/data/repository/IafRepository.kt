@@ -1,6 +1,7 @@
 package com.example.data.repository
 
 import com.example.data.local.*
+import com.example.data.remote.FirestoreSyncManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -9,7 +10,10 @@ import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.*
 
-class IafRepository(private val db: IafDatabase) {
+class IafRepository(
+    private val db: IafDatabase,
+    var syncManager: FirestoreSyncManager? = null
+) {
     private val userDao = db.userDao()
     private val studentDao = db.studentDao()
     private val linkDao = db.parentStudentLinkDao()
@@ -833,24 +837,27 @@ class IafRepository(private val db: IafDatabase) {
 
         // Create initial pending fee entry for current month
         val currentMonth = SimpleDateFormat("MMMM yyyy", Locale.US).format(Date())
-        feeDao.insertFee(
-            FeePaymentEntity(
-                studentId = id,
-                studentName = student.fullName,
-                instituteStudentCode = studentCode,
-                invoiceMonth = currentMonth,
-                amountDue = maxOf(0.0, monthlyFee - approvedConcession),
-                amountPaid = 0.0,
-                paymentMethod = "Cash",
-                status = "Unpaid"
-            )
+        val initialFee = FeePaymentEntity(
+            studentId = id,
+            studentName = student.fullName,
+            instituteStudentCode = studentCode,
+            invoiceMonth = currentMonth,
+            amountDue = maxOf(0.0, monthlyFee - approvedConcession),
+            amountPaid = 0.0,
+            paymentMethod = "Cash",
+            status = "Unpaid"
         )
+        feeDao.insertFee(initialFee)
+
+        syncManager?.pushStudent(createdStudent)
+        syncManager?.pushFeePayment(initialFee)
 
         Result.success(createdStudent)
     }
 
     suspend fun updateStudent(student: StudentEntity, teacherUsername: String) = withContext(Dispatchers.IO) {
         studentDao.updateStudent(student)
+        syncManager?.pushStudent(student)
         auditDao.insertLog(
             AuditLogEntity(
                 action = "STUDENT_UPDATED",
@@ -930,6 +937,7 @@ class IafRepository(private val db: IafDatabase) {
             studentName = matchingStudents.first().fullName,
             status = "Pending"
         )
+        syncManager?.pushParentStudentLink(resultEntity)
 
         auditDao.insertLog(
             AuditLogEntity(
@@ -955,6 +963,7 @@ class IafRepository(private val db: IafDatabase) {
             rejectionReason = if (!approve) rejectionReason ?: "Rejected by institute administration" else null
         )
         linkDao.updateLink(updated)
+        syncManager?.pushParentStudentLink(updated)
 
         auditDao.insertLog(
             AuditLogEntity(
@@ -979,6 +988,7 @@ class IafRepository(private val db: IafDatabase) {
         teacherUsername: String
     ) = withContext(Dispatchers.IO) {
         attendanceDao.insertAll(records)
+        records.forEach { syncManager?.pushAttendance(it) }
         auditDao.insertLog(
             AuditLogEntity(
                 action = "ATTENDANCE_RECORDED",
@@ -993,6 +1003,7 @@ class IafRepository(private val db: IafDatabase) {
         teacherUsername: String
     ) = withContext(Dispatchers.IO) {
         attendanceDao.updateAttendance(record)
+        syncManager?.pushAttendance(record)
         auditDao.insertLog(
             AuditLogEntity(
                 action = "ATTENDANCE_UPDATED",
@@ -1015,6 +1026,7 @@ class IafRepository(private val db: IafDatabase) {
         teacherUsername: String
     ) = withContext(Dispatchers.IO) {
         quranRecordDao.insertRecord(record)
+        syncManager?.pushQuranRecord(record)
         auditDao.insertLog(
             AuditLogEntity(
                 action = "QURAN_RECORD_SAVED",
@@ -1063,6 +1075,7 @@ class IafRepository(private val db: IafDatabase) {
         )
         val id = feeDao.insertFee(payment)
         val created = payment.copy(id = id)
+        syncManager?.pushFeePayment(created)
 
         auditDao.insertLog(
             AuditLogEntity(
@@ -1090,6 +1103,7 @@ class IafRepository(private val db: IafDatabase) {
             notes = notes ?: fee.notes
         )
         feeDao.updateFee(updated)
+        syncManager?.pushFeePayment(updated)
 
         auditDao.insertLog(
             AuditLogEntity(

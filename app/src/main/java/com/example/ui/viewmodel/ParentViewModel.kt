@@ -95,6 +95,17 @@ class ParentViewModel(
             return
         }
 
+        // Security check: Only load student data if the student is among approved links for this parent
+        val isApproved = approvedLinks.value.any { it.studentId == studentId }
+        if (!isApproved) {
+            _selectedStudent.value = null
+            _attendance.value = emptyList()
+            _quranRecords.value = emptyList()
+            _fees.value = emptyList()
+            _statusMessage.value = "Access denied: You can only view approved linked students."
+            return
+        }
+
         viewModelScope.launch {
             val student = repository.getStudentById(studentId)
             _selectedStudent.value = student

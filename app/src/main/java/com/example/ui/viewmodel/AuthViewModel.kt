@@ -100,26 +100,6 @@ class AuthViewModel(private val repository: IafRepository) : ViewModel() {
         _uiState.value = _uiState.value.copy(errorMessage = null, successMessage = null)
     }
 
-    fun fillDemoTeacher() {
-        _uiState.value = _uiState.value.copy(
-            selectedPortal = "Teacher",
-            instituteIdInput = IafRepository.INSTITUTE_ID,
-            usernameInput = "teacher.demo",
-            passwordInput = "teacher123",
-            errorMessage = null
-        )
-    }
-
-    fun fillDemoParent() {
-        _uiState.value = _uiState.value.copy(
-            selectedPortal = "Parent",
-            instituteIdInput = IafRepository.INSTITUTE_ID,
-            usernameInput = "parent.demo",
-            passwordInput = "parent123",
-            errorMessage = null
-        )
-    }
-
     fun login() {
         val s = _uiState.value
         if (s.usernameInput.isBlank() || s.passwordInput.isBlank()) {

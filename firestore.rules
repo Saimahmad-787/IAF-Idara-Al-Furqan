@@ -2,16 +2,17 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // Default Deny
+    // Default Deny Everything
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Helper functions
+    // Authentication & Identity helpers
     function isAuthenticated() {
       return request.auth != null;
     }
 
+    // Role helpers verified via custom claims or verified institute role
     function isTeacher(instituteId) {
       return isAuthenticated() && 
         request.auth.token.instituteId == instituteId &&
@@ -24,54 +25,91 @@ service cloud.firestore {
         request.auth.token.role == 'Parent';
     }
 
-    function isLinkedParent(instituteId, studentId) {
-      return isParent(instituteId) &&
-        exists(/databases/$(database)/documents/institutes/$(instituteId)/parent_student_links/$(request.auth.uid + '_' + studentId)) &&
-        get(/databases/$(database)/documents/institutes/$(instituteId)/parent_student_links/$(request.auth.uid + '_' + studentId)).data.status == 'Approved';
+    function isStudent(instituteId) {
+      return isAuthenticated() &&
+        request.auth.token.instituteId == instituteId &&
+        request.auth.token.role == 'Student';
+    }
+
+    // Parent or Student linked relationship check:
+    // 1) For parents: requires an approved parent_student_link document
+    // 2) For students: requires their auth UID to match their registered student record or approved link
+    function isAuthorizedStudentOrParent(instituteId, studentId) {
+      return (
+        // Case A: Approved Parent
+        (isParent(instituteId) &&
+          exists(/databases/$(database)/documents/institutes/$(instituteId)/parent_student_links/$(request.auth.uid + '_' + studentId)) &&
+          get(/databases/$(database)/documents/institutes/$(instituteId)/parent_student_links/$(request.auth.uid + '_' + studentId)).data.status == 'Approved')
+        ||
+        // Case B: Approved Student (Direct student account linked to this studentId)
+        (isStudent(instituteId) && (
+          (request.auth.token.studentId == studentId) ||
+          (exists(/databases/$(database)/documents/institutes/$(instituteId)/parent_student_links/$(request.auth.uid + '_' + studentId)) &&
+           get(/databases/$(database)/documents/institutes/$(instituteId)/parent_student_links/$(request.auth.uid + '_' + studentId)).data.status == 'Approved')
+        ))
+      );
     }
 
     match /institutes/{instituteId} {
+      // General institute metadata is readable by authenticated users of this app
       allow read: if isAuthenticated();
       
-      // Teachers have full management inside their institute
+      // Teachers have full administrative management inside their assigned institute only
       match /teachers/{teacherId} {
         allow read: if isAuthenticated() && request.auth.token.instituteId == instituteId;
         allow write: if isTeacher(instituteId);
       }
 
-      // Students collection
+      // Students collection:
+      // Only teachers or the approved student/parent linked to this specific studentId can read
+      // Only teachers can create, edit, or delete student profiles
       match /students/{studentId} {
-        allow read: if isTeacher(instituteId) || isLinkedParent(instituteId, studentId);
+        allow read: if isTeacher(instituteId) || isAuthorizedStudentOrParent(instituteId, studentId);
         allow write: if isTeacher(instituteId);
       }
 
-      // Parent-Student Links
+      // Parent/Student Links & Verification Requests:
+      // Students/Parents can only read their own link requests
+      // Students/Parents can only submit a 'Pending' link request for their own UID
+      // Only teachers can approve or reject (status != 'Pending') or delete
       match /parent_student_links/{linkId} {
-        allow read: if isTeacher(instituteId) || (isParent(instituteId) && resource.data.parentUid == request.auth.uid);
-        allow create: if isParent(instituteId) && request.resource.data.parentUid == request.auth.uid && request.resource.data.status == 'Pending';
+        allow read: if isTeacher(instituteId) || 
+          ((isParent(instituteId) || isStudent(instituteId)) && resource.data.parentUid == request.auth.uid);
+        allow create: if (isParent(instituteId) || isStudent(instituteId)) &&
+          request.resource.data.parentUid == request.auth.uid &&
+          request.resource.data.status == 'Pending';
         allow update, delete: if isTeacher(instituteId);
       }
 
-      // Attendance
+      // Attendance:
+      // Read: Teacher OR approved student/parent for this specific student
+      // Write: Only teacher
       match /attendance/{attendanceId} {
-        allow read: if isTeacher(instituteId) || isLinkedParent(instituteId, resource.data.studentId);
+        allow read: if isTeacher(instituteId) || isAuthorizedStudentOrParent(instituteId, resource.data.studentId);
         allow write: if isTeacher(instituteId);
       }
 
-      // Quran Learning
+      // Quran Learning / Sabaq / Hifz:
+      // Read: Teacher OR approved student/parent for this specific student
+      // Write: Only teacher
       match /quran_records/{recordId} {
-        allow read: if isTeacher(instituteId) || isLinkedParent(instituteId, resource.data.studentId);
+        allow read: if isTeacher(instituteId) || isAuthorizedStudentOrParent(instituteId, resource.data.studentId);
         allow write: if isTeacher(instituteId);
       }
 
-      // Fee Payments & Invoices
+      // Fee Payments & Invoices:
+      // Read: Teacher OR approved student/parent for this specific student
+      // Create: Approved student/parent can submit payment screenshots with status 'Pending Verification'
+      // Update/Delete/Approval: Only teacher
       match /fee_payments/{feeId} {
-        allow read: if isTeacher(instituteId) || isLinkedParent(instituteId, resource.data.studentId);
-        allow create: if isLinkedParent(instituteId, request.resource.data.studentId) && request.resource.data.status == 'Pending Verification';
+        allow read: if isTeacher(instituteId) || isAuthorizedStudentOrParent(instituteId, resource.data.studentId);
+        allow create: if isAuthorizedStudentOrParent(instituteId, request.resource.data.studentId) &&
+          request.resource.data.status == 'Pending Verification';
         allow update, delete: if isTeacher(instituteId);
       }
 
-      // Shifts & Prayers
+      // Shifts & Prayers:
+      allow read: if isAuthenticated();
       match /shifts/{shiftId} {
         allow read: if isAuthenticated();
         allow write: if isTeacher(instituteId);
@@ -82,7 +120,7 @@ service cloud.firestore {
         allow write: if isTeacher(instituteId);
       }
 
-      // Retention Reviews & Audits
+      // Retention Reviews & Audits:
       match /retention_reviews/{reviewId} {
         allow read, write: if isTeacher(instituteId);
       }

@@ -31,7 +31,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         val db = IafDatabase.getDatabase(applicationContext)
-        val repository = IafRepository(db)
+        val syncManager = com.example.data.remote.FirestoreSyncManager(applicationContext, db)
+        val repository = IafRepository(db, syncManager)
         val authViewModel = AuthViewModel(repository)
         val teacherViewModel = TeacherViewModel(repository)
 
@@ -47,6 +48,14 @@ class MainActivity : ComponentActivity() {
                 MyApplicationTheme(darkTheme = authUiState.isDarkMode) {
                     Surface(modifier = Modifier.fillMaxSize()) {
                         val currentUser = authUiState.currentUser
+
+                        androidx.compose.runtime.LaunchedEffect(currentUser) {
+                            if (currentUser != null) {
+                                syncManager.startRealtimeSync(currentUser.role, currentUser.username)
+                            } else {
+                                syncManager.stopRealtimeSync()
+                            }
+                        }
 
                         if (currentUser == null) {
                             LoginScreen(

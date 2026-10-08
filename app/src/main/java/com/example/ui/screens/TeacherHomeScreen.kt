@@ -2809,8 +2809,8 @@ fun TeacherMoreSubscreen(
                             // Back Button and Student Header
                             Surface(
                                 shape = RoundedCornerShape(10.dp),
-                                color = Color.White,
-                                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                                color = appCardColor(),
+                                border = BorderStroke(1.dp, appBorderColor()),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
@@ -2848,12 +2848,12 @@ fun TeacherMoreSubscreen(
                                         text = student.fullName,
                                         fontSize = 16.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF0F172A)
+                                        color = appTextColor()
                                     )
                                     Text(
                                         text = "${student.program} • Class: ${student.className} • ID: ${student.instituteStudentCode}",
                                         fontSize = 12.sp,
-                                        color = Color(0xFF64748B)
+                                        color = appSubtextColor()
                                     )
                                 }
                             }
